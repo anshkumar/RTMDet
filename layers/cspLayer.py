@@ -71,7 +71,7 @@ class ChannelAttention(tf.keras.layers.Layer):
         self.global_avgpool = tfa.layers.AdaptiveAveragePooling2D(1)
         self.fc = tf.keras.layers.Conv2D(channels, 1, 1, padding="same")
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x):
         """Forward function for ChannelAttention."""
         # TODO: Disable Mixed precision for AdaptiveAveragePooling2D
         out = self.global_avgpool(x)

@@ -1,6 +1,7 @@
 import tensorflow as tf
 from layers.cspLayer import CSPLayer
 from layers.sppLayer import SPPBottleneck
+from typing import Sequence, Tuple
 
 class BatchNorm(tf.keras.layers.BatchNormalization):
     """Extends the Keras BatchNormalization class to allow a central place
@@ -76,15 +77,16 @@ class CSPNeXt(tf.keras.layers.Layer):
         arch_ovewrite: dict = None,
         spp_kernel_sizes: Sequence[int] = (5, 9, 13),
         channel_attention: bool = True,
-        init_cfg: OptMultiConfig = dict(
-            type='Kaiming',
-            layer='Conv2d',
-            a=math.sqrt(5),
-            distribution='uniform',
-            mode='fan_in',
-            nonlinearity='leaky_relu')
+        **kwargs
+        # init_cfg: OptMultiConfig = dict(
+        #     type='Kaiming',
+        #     layer='Conv2d',
+        #     a=math.sqrt(5),
+        #     distribution='uniform',
+        #     mode='fan_in',
+        #     nonlinearity='leaky_relu')
     ) -> None:
-        super().__init__(init_cfg=init_cfg)
+        super(CSPNeXt, self).__init__(**kwargs)
         arch_setting = self.arch_settings[arch]
         if arch_ovewrite:
             arch_setting = arch_ovewrite
@@ -95,20 +97,20 @@ class CSPNeXt(tf.keras.layers.Layer):
 
         self.layers = []
         for i, (out_channels, num_blocks, add_identity, use_spp) in enumerate(arch_setting):
-        	out_channels = int(out_channels * widen_factor)
-        	num_blocks = max(round(num_blocks * deepen_factor), 1)
-        	stage = []
-        	stage.append(conv_bn_act(out_channels=out_channels, kernel_size=3, strides=2,))
-        	if use_spp:
-        		stage.append(SPPBottleneck(out_channels=out_channels, pool_sizes=spp_kernel_sizes,))
-        	stage.append(CSPLayer(out_channels=out_channels, num_blocks=num_blocks, add_identity=add_identity, expand_ratio=expand_ratio, channel_attention=channel_attention, ))
-        	self.layers.append(tf.keras.Sequential(stage, name='stage'+str(i)))
+            out_channels = int(out_channels * widen_factor)
+            num_blocks = max(round(num_blocks * deepen_factor), 1)
+            stage = []
+            stage.append(conv_bn_act(out_channels=out_channels, kernel_size=3, strides=2,))
+            if use_spp:
+                stage.append(SPPBottleneck(out_channels=out_channels, pool_sizes=spp_kernel_sizes,))
+            stage.append(CSPLayer(out_channels=out_channels, num_blocks=num_blocks, add_identity=add_identity, expand_ratio=expand_ratio, channel_attention=channel_attention, ))
+            self.layers.append(tf.keras.Sequential(stage, name='stage'+str(i)))
 
     def call(self, x, training=True):
-    	outs = []
+        outs = []
 
-    	for layer in self.layers:
-    		x = layer(x, training=training)
-    		if i in self.out_indices:
+        for layer in self.layers:
+            x = layer(x, training=training)
+            if i in self.out_indices:
                 outs.append(x)
         return tuple(outs)
