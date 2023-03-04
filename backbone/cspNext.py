@@ -55,13 +55,13 @@ class CSPNeXt(tf.keras.layers.Layer):
             stage. Defaults to True.
     """
     # From left to right:
-    # in_channels, out_channels, num_blocks, add_identity, use_spp
+    # out_channels, num_blocks, add_identity, use_spp
     arch_settings = {
-        'P5': [[64, 128, 3, True, False], [128, 256, 6, True, False],
-               [256, 512, 6, True, False], [512, 1024, 3, False, True]],
-        'P6': [[64, 128, 3, True, False], [128, 256, 6, True, False],
-               [256, 512, 6, True, False], [512, 768, 3, True, False],
-               [768, 1024, 3, False, True]]
+        'P5': [[128, 3, True, False], [256, 6, True, False],
+               [512, 6, True, False], [1024, 3, False, True]],
+        'P6': [[128, 3, True, False], [256, 6, True, False],
+               [512, 6, True, False], [768, 3, True, False],
+               [1024, 3, False, True]]
     }
 
     def __init__(
@@ -92,7 +92,7 @@ class CSPNeXt(tf.keras.layers.Layer):
         self.out_indices = out_indices
 
         self.layers = []
-        for i, (in_channels, out_channels, num_blocks, add_identity, use_spp) in enumerate(arch_setting):
+        for i, (out_channels, num_blocks, add_identity, use_spp) in enumerate(arch_setting):
         	out_channels = int(out_channels * widen_factor)
         	num_blocks = max(round(num_blocks * deepen_factor), 1)
         	stage = []
@@ -106,7 +106,7 @@ class CSPNeXt(tf.keras.layers.Layer):
     	outs = []
 
     	for layer in self.layers:
-    		x = layer(x)
+    		x = layer(x, training=training)
     		if i in self.out_indices:
                 outs.append(x)
         return tuple(outs)
