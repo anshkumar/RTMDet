@@ -109,7 +109,7 @@ class CSPNeXt(tf.keras.layers.Layer):
     def call(self, x, training=True):
         outs = []
 
-        for layer in self.layers:
+        for i, layer in enumerate(self.layers):
             x = layer(x, training=training)
             if i in self.out_indices:
                 outs.append(x)
