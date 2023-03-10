@@ -17,10 +17,49 @@ class BatchNorm(tf.keras.layers.BatchNormalization):
         """
         return super(self.__class__, self).call(inputs, training=training)
 
+class WeightStandardizedConv2D(tf.keras.layers.Conv2D):
+    def convolution_op(self, inputs, kernel):
+        mean, var = tf.nn.moments(kernel, axes=[0, 1, 2], keepdims=True)
+        return tf.nn.conv2d(
+            inputs,
+            (kernel - mean) / tf.sqrt(var + 1e-10),
+            padding="SAME",
+            strides=list(self.strides),
+            name=self.__class__.__name__,
+        )
+
+class WeightStandardizedSepConv2D(tf.keras.layers.SeparableConv2D):
+    def convolution_op(self, inputs, kernel):
+        mean, var = tf.nn.moments(kernel, axes=[0, 1, 2], keepdims=True)
+        return tf.nn.depthwise_conv2d(
+            inputs,
+            (kernel - mean) / tf.sqrt(var + 1e-10),
+            padding="SAME",
+            strides=list(self.strides),
+            name=self.__class__.__name__,
+        )
+
 def conv_bn_act(out_channels, kernel_size, strides, groups=1, name=None):
     return tf.keras.Sequential(
         [
-            tf.keras.layers.Conv2D(
+            WeightStandardizedConv2D(
+                filters=out_channels,
+                kernel_size=kernel_size,
+                strides=strides,
+                padding="same",
+                groups=groups,
+                use_bias=False,
+                name="conv",
+            ),
+            BatchNorm(momentum=0.03, epsilon=0.001, name="bn"),
+            tf.keras.layers.Activation('selu'),
+        ], name=name
+    )
+
+def sep_conv_bn_act(out_channels, kernel_size, strides, groups=1, name=None):
+    return tf.keras.Sequential(
+        [
+            WeightStandardizedSepConv2D(
                 filters=out_channels,
                 kernel_size=kernel_size,
                 strides=strides,

@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
-from layers.convBnAct import BatchNorm
+from layers.convBnAct import conv_bn_act, sep_conv_bn_act
 
 class CSPNeXtBlock(tf.keras.layers.Layer):
     """The basic bottleneck block used in CSPNeXt.
@@ -14,30 +14,15 @@ class CSPNeXtBlock(tf.keras.layers.Layer):
     """
     def __init__(self, out_channels, expansion=0.5, add_identity=True, **kwargs):
         super(CSPNeXtBlock, self).__init__(**kwargs)
-        self.conv_1 = tf.keras.layers.Conv2D(int(out_channels * expansion), (3, 3), 1, padding="same", use_bias=False,
-                                           kernel_initializer='lecun_normal',
-                                          )
-        self.batch_norm_1 = BatchNorm(momentum=0.03, epsilon=0.001)
-        self.act_1 = tf.keras.layers.Activation('selu')
-
-        self.conv_2 = tf.keras.layers.SeparableConv2D(out_channels, (5, 5), 1, padding="same",
-                                           kernel_initializer='lecun_normal',
-                                          )
-        self.batch_norm_2 = BatchNorm(momentum=0.03, epsilon=0.001)
-        self.act_2 = tf.keras.layers.Activation('selu')
-
+        self.conv_1 = conv_bn_act(int(out_channels * expansion), (3, 3), 1)
+        self.conv_2 = sep_conv_bn_act(out_channels, (5, 5), 1)
         self.add_identity = add_identity
 
     def call(self, x, training=True):
         identity = x
 
-        x = self.conv_1(x)
-        x = self.batch_norm_1(x, training)
-        x = self.act_1(x)
-
-        x = self.conv_2(x)
-        x = self.batch_norm_2(x, training)
-        x = self.act_2(x)
+        x = self.conv_1(x, training=training)
+        x = self.conv_2(x, training=training)
 
         if self.add_identity:
             x = x + identity
@@ -81,47 +66,23 @@ class CSPLayer(tf.keras.layers.Layer):
         self.channel_attention = channel_attention
 
         mid_channels = int(out_channels * expand_ratio)
-        self.short_conv = tf.keras.layers.SeparableConv2D(mid_channels, (1, 1), 1, padding="same",
-                                           kernel_initializer='lecun_normal',
-                                          )
-        self.batch_norm_1 = BatchNorm(momentum=0.03, epsilon=0.001)
-        self.act_1 = tf.keras.layers.Activation('selu')
-
-        
-        self.main_conv = tf.keras.layers.Conv2D(mid_channels, (1, 1), 1, padding="same", use_bias=False,
-                                           kernel_initializer='lecun_normal', 
-                                          )
-        self.batch_norm_2 = BatchNorm(momentum=0.03, epsilon=0.001)
-        self.act_2 = tf.keras.layers.Activation('selu')
-
+        self.short_conv = sep_conv_bn_act(mid_channels, (1, 1), 1)
+        self.main_conv = conv_bn_act(mid_channels, (1, 1), 1)
         self.blocks = tf.keras.Sequential([CSPNeXtBlock(mid_channels, 1.0, add_identity) for _ in range(num_blocks)])
-
-        self.final_conv = tf.keras.layers.SeparableConv2D(out_channels, (1, 1), 1, padding="same",
-                                           kernel_initializer='lecun_normal',
-                                          )
-        self.batch_norm_3 = BatchNorm(momentum=0.03, epsilon=0.001)
-        self.act_3 = tf.keras.layers.Activation('selu')
+        self.final_conv = sep_conv_bn_act(out_channels, (1, 1), 1)
 
         if channel_attention:
             self.attention = ChannelAttention(2 * mid_channels)
 
     def call(self, x, training=True):
-        x_short = self.short_conv(x)
-        x_short = self.batch_norm_1(x_short, training)
-        x_short = self.act_1(x_short)
-
-        x_main = self.main_conv(x)
-        x_main = self.batch_norm_2(x_main, training)
-        x_main = self.act_2(x_main)
-
-        x_main = self.blocks(x_main, training)
+        x_short = self.short_conv(x, training=training)
+        x_main = self.main_conv(x, training=training)
+        x_main = self.blocks(x_main, training=training)
 
         x_final = tf.concat((x_main, x_short), axis=-1)
 
         if self.channel_attention:
             x_final = self.attention(x_final)
             
-        x_final = self.final_conv(x_final)
-        x_final = self.batch_norm_3(x_final, training)
-        x_final = self.act_3(x_final)
+        x_final = self.final_conv(x_final, training=training)
         return x_final

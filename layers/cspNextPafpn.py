@@ -10,19 +10,16 @@ class CSPNeXtPAFPN(tf.keras.layers.Layer):
         out_channels (int): Number of output channels (used at each scale)
         num_csp_blocks (int): Number of bottlenecks in CSPLayer.
             Defaults to 3.
-        use_depthwise (bool): Whether to use depthwise separable convolution in
-            blocks. Defaults to False.
         expand_ratio (float): Ratio to adjust the number of channels of the
             hidden layer. Default: 0.5
-        upsample_cfg (dict): Config dict for interpolate layer.
-            Default: `dict(scale_factor=2, mode='nearest')`
+        upsample_factor (float): Factor for interpolate layer.
+            Default: 2
     """
     def __init__(   
         self,
         in_channels: Sequence[int],
         out_channels: int,
         num_csp_blocks: int = 3,
-        use_depthwise: bool = False,
         expand_ratio: float = 0.5,
         upsample_factor: int=2,
         **kwargs
