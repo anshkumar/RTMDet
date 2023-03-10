@@ -39,7 +39,7 @@ class WeightStandardizedSepConv2D(tf.keras.layers.SeparableConv2D):
             name=self.__class__.__name__,
         )
 
-def conv_bn_act(out_channels, kernel_size, strides, groups=1, name=None):
+def conv_bn_act(out_channels, kernel_size, strides, groups=1, activation='selu', name=None):
     return tf.keras.Sequential(
         [
             WeightStandardizedConv2D(
@@ -52,11 +52,11 @@ def conv_bn_act(out_channels, kernel_size, strides, groups=1, name=None):
                 name="conv",
             ),
             BatchNorm(momentum=0.03, epsilon=0.001, name="bn"),
-            tf.keras.layers.Activation('selu'),
+            tf.keras.layers.Activation(activation),
         ], name=name
     )
 
-def sep_conv_bn_act(out_channels, kernel_size, strides, groups=1, name=None):
+def sep_conv_bn_act(out_channels, kernel_size, strides, groups=1, activation='selu', name=None):
     return tf.keras.Sequential(
         [
             WeightStandardizedSepConv2D(
@@ -69,7 +69,6 @@ def sep_conv_bn_act(out_channels, kernel_size, strides, groups=1, name=None):
                 name="conv",
             ),
             BatchNorm(momentum=0.03, epsilon=0.001, name="bn"),
-            tf.keras.layers.Activation('selu'),
+            tf.keras.layers.Activation(activation),
         ], name=name
     )
-    

@@ -1,12 +1,16 @@
 import tensorflow as tf
 from layers.convBnAct import conv_bn_act
+from layers.maskNet import MaskFeatModule
 
 class RTMDetInsSepBNHead(tf.keras.layers.Layer):
     """Detection Head of RTMDet-Ins with sep-bn layers.
     Args:
         num_classes (int): Number of categories excluding the background
             category.
+        num_anchors (int): Number of anchors per pixel.
         num_feats (int): Number of features used for predictions.
+        in_feat_chan (int): Number of channels in input features.
+        out_feat_chan (int): Number of channels in output features.
         pred_kernel_size (int): Kernel size of prediction layer. Defaults to 1.
         stacked_convs (int): Number of stacked convs layers of prediction.
         num_prototypes (int): Number of mask prototype features extracted
@@ -21,7 +25,10 @@ class RTMDetInsSepBNHead(tf.keras.layers.Layer):
     """
     def __init__(self,
                  num_classes: int,
+                 num_anchors: int,
                  num_feats: int,
+                 in_feat_chan: int = 256,
+                 out_feat_chan: int = 256,
                  pred_kernel_size: int = 1,
                  stacked_convs: int = 2,
                  num_prototypes: int = 8,
@@ -30,12 +37,15 @@ class RTMDetInsSepBNHead(tf.keras.layers.Layer):
                  mask_loss_stride: int = 4,
                  **kwargs) -> None:
         super(RTMDetInsSepBNHead, self).__init__()
-        self.share_conv = share_conv
+        self.out_feat_chan = out_feat_chan
         self.stacked_convs = stacked_convs
         self.num_prototypes = num_prototypes
         self.num_dyconvs = num_dyconvs
         self.dyconv_channels = dyconv_channels
         self.mask_loss_stride = mask_loss_stride
+        self.num_class = num_classes
+        self.num_anchors = num_anchors
+        self.pred_kernel_size = pred_kernel_size
 
         """Initialize layers of the head."""
         self.kernel_convs = []
@@ -66,9 +76,8 @@ class RTMDetInsSepBNHead(tf.keras.layers.Layer):
         reg_convs = []
         
         for i in range(self.stacked_convs):
-            cls_convs.append(conv_bn_act(self.feat_channels, 3, 1))
-            reg_convs.append(conv_bn_act(self.feat_channels, 3, 1))
-            
+            cls_convs.append(conv_bn_act(self.out_feat_chan, 3, 1))
+            reg_convs.append(conv_bn_act(self.out_feat_chan, 3, 1))
 
         self.cls_convs = tf.keras.Sequential(cls_convs)
         self.reg_convs = tf.keras.Sequential(reg_convs)
@@ -76,7 +85,7 @@ class RTMDetInsSepBNHead(tf.keras.layers.Layer):
         for _ in range(num_feats):
             kernel_convs = []
             for i in range(self.stacked_convs):
-                kernel_convs.append(conv_bn_act(self.feat_channels, 3, 1))
+                kernel_convs.append(conv_bn_act(self.out_feat_chan, 3, 1))
 
             self.kernel_convs.append(tf.keras.Sequential(kernel_convs))
             self.rtm_cls.append(tf.keras.layers.Conv2D(self.num_class * self.num_anchors, self.pred_kernel_size, 1, padding="same",
@@ -88,6 +97,12 @@ class RTMDetInsSepBNHead(tf.keras.layers.Layer):
             self.rtm_kernel.append(tf.keras.layers.Conv2D(self.num_gen_params, self.pred_kernel_size, 1, padding="same",
                                               kernel_initializer= tf.keras.initializers.TruncatedNormal(stddev=0.03),
                                             ))
+        self.mask_head = MaskFeatModule(
+            in_channels=in_feat_chan, 
+            feat_channels=self.out_feat_chan,
+            stacked_convs=4,
+            num_levels=num_feats,
+            num_prototypes=self.num_prototypes,)
 
     def call(self, feats):
         """Forward features from the upstream network.
@@ -133,4 +148,3 @@ class RTMDetInsSepBNHead(tf.keras.layers.Layer):
             kernel_preds.append(kernel_pred)
 
         return tuple(cls_scores), tuple(bbox_preds), tuple(kernel_preds), mask_feat
-        

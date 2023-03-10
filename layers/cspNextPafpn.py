@@ -18,7 +18,7 @@ class CSPNeXtPAFPN(tf.keras.layers.Layer):
     def __init__(   
         self,
         in_channels: Sequence[int],
-        out_channels: int,
+        out_channels: int = 256,
         num_csp_blocks: int = 3,
         expand_ratio: float = 0.5,
         upsample_factor: int=2,
